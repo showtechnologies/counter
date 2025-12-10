@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Countdown Evento / Capodanno</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    :root {
+      --bg-color: #000000;
+      --text-color: #ffffff;
+      --font-size-base: 8vw; /* scala con la larghezza finestra */
+      --count-font-family: "SF Mono", "Menlo", "Consolas", "Roboto Mono", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #111;
+      color: #eee;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .page {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    header {
+      padding: 0.5rem 1rem;
+      background: #222;
+      border-bottom: 1px solid #333;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+    }
+
+    .current-time {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 0.8rem;
+      align-items: center;
+    }
+
+    .controls label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .controls input[type="datetime-local"] {
+      font-size: 0.8rem;
+      padding: 0.1rem 0.2rem;
+    }
+
+    .controls input[type="color"] {
+      padding: 0;
+      border: none;
+      width: 2rem;
+      height: 1.2rem;
+      background: none;
+    }
+
+    .controls input[type="checkbox"] {
+      transform: scale(1.1);
+    }
+
+    .controls input[type="text"] {
+      font-size: 0.8rem;
+      padding: 0.1rem 0.3rem;
+      min-width: 10rem;
+      max-width: 16rem;
+    }
+
+    .controls input[type="number"] {
+      font-size: 0.8rem;
+      padding: 0.1rem 0.3rem;
+      width: 4rem;
+    }
+
+    .controls button {
+      font-size: 0.8rem;
+      padding: 0.2rem 0.6rem;
+      cursor: pointer;
+      border-radius: 4px;
+      border: 1px solid #444;
+      background: #333;
+      color: #eee;
+    }
+
+    .controls button:hover {
+      background: #444;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      transition: background-color 0.2s, color 0.2s;
+    }
+
+    .countdown-wrapper {
+      text-align: center;
+      width: 100%;
+      padding: 0 2vw;
+    }
+
+    .countdown-label {
+      font-family: var(--count-font-family);
+      font-size: var(--font-size-base);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-shadow: 0.05em 0.05em 0.1em rgba(0, 0, 0, 0.7);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: clip;
+    }
+
+    /* Parte intera e decimi separati */
+    #countInt {
+      display: inline-block;
+    }
+
+    #countDec {
+      display: inline-block;
+      font-size: 0.4em;        /* decimi più piccoli */
+      vertical-align: top;     /* in alto rispetto alla cifra grande */
+      margin-left: 0.05em;     /* piccolo distacco orizzontale */
+    }
+
+    @media (max-width: 768px) {
+      .controls {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .countdown-label {
+        font-size: 10vw;
+      }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+  <header id="headerBar">
+    <div>
+      <div style="font-weight:600;">Countdown Evento / Capodanno (HTML)</div>
+      <div class="current-time" id="currentTimeLabel">--:--:--</div>
+    </div>
+
+    <div class="controls">
+      <label>
+        Target:
+        <input type="datetime-local" id="targetInput">
+      </label>
+
+      <label>
+        Testo:
+        <input type="color" id="textColorInput" value="#ffffff">
+      </label>
+
+      <label>
+        Sfondo:
+        <input type="color" id="bgColorInput" value="#000000">
+      </label>
+
+      <label>
+        Font:
+        <input type="text" id="fontFamilyInput"
+               value='SF Mono, Menlo, Consolas, "Roboto Mono", monospace'>
+      </label>
+
+      <label>
+        Dim (vw):
+        <input type="number" id="fontSizeInput" min="2" max="20" step="0.5" value="8">
+      </label>
+
+      <label>
+        <input type="checkbox" id="decimalsCheckbox">
+        Decimi sotto i 10s
+      </label>
+
+      <button id="startBtn">Imposta / Riavvia</button>
+      <button id="fullscreenBtn">Full screen</button>
+      <span style="font-size:0.75rem;opacity:0.7;">(tasto H: mostra/nascondi comandi)</span>
+    </div>
+  </header>
+
+  <main id="countdownArea">
+    <div class="countdown-wrapper">
+      <div class="countdown-label" id="countdownText">
+        <span id="countInt">Imposta una data di arrivo</span><span id="countDec"></span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  (function () {
+    const countdownText    = document.getElementById("countdownText");
+    const countIntSpan     = document.getElementById("countInt");
+    const countDecSpan     = document.getElementById("countDec");
+    const currentTimeLabel = document.getElementById("currentTimeLabel");
+    const targetInput      = document.getElementById("targetInput");
+    const decimalsCheckbox = document.getElementById("decimalsCheckbox");
+    const textColorInput   = document.getElementById("textColorInput");
+    const bgColorInput     = document.getElementById("bgColorInput");
+    const fontFamilyInput  = document.getElementById("fontFamilyInput");
+    const fontSizeInput    = document.getElementById("fontSizeInput");
+    const startBtn         = document.getElementById("startBtn");
+    const fullscreenBtn    = document.getElementById("fullscreenBtn");
+    const headerBar        = document.getElementById("headerBar");
+
+    let targetTime   = null;   // timestamp ms
+    let timerId      = null;   // setInterval id per countdown
+    let blinkId      = null;   // blink finale
+    let finished     = false;
+    let blinkVisible = true;
+    let controlsVisible = true;
+
+    // Default target: +24 ore
+    function setDefaultTarget() {
+      const now   = new Date();
+      const t     = new Date(now.getTime() + 24 * 3600 * 1000);
+      const local = new Date(t.getTime() - t.getTimezoneOffset() * 60000);
+      const value = local.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
+      targetInput.value = value;
+    }
+    setDefaultTarget();
+
+    // Ora corrente
+    function updateCurrentTime() {
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, "0");
+      const yyyy = now.getFullYear();
+      const MM   = pad(now.getMonth() + 1);
+      const dd   = pad(now.getDate());
+      const hh   = pad(now.getHours());
+      const mm   = pad(now.getMinutes());
+      const ss   = pad(now.getSeconds());
+      currentTimeLabel.textContent = `${dd}/${MM}/${yyyy} ${hh}:${mm}:${ss}`;
+    }
+    setInterval(updateCurrentTime, 200);
+    updateCurrentTime();
+
+    // Font + dimensione
+    function applyFontSettings() {
+      const ff = fontFamilyInput.value || 'SF Mono, Menlo, Consolas, "Roboto Mono", monospace';
+      const sz = parseFloat(fontSizeInput.value) || 8;
+      document.documentElement.style.setProperty("--count-font-family", ff);
+      document.documentElement.style.setProperty("--font-size-base", sz + "vw");
+    }
+    applyFontSettings();
+
+    fontFamilyInput.addEventListener("change", applyFontSettings);
+    fontSizeInput.addEventListener("change", applyFontSettings);
+
+    // Toggle visibilità comandi (header) – tasto H
+    function setControlsVisibility(visible) {
+      controlsVisible = visible;
+      headerBar.style.display = visible ? "flex" : "none";
+    }
+
+    // Countdown
+    function updateCountdown() {
+      if (!targetTime || finished) {
+        return;
+      }
+
+      const now = Date.now();
+      let msecsTo = targetTime - now;
+
+      // Se abbiamo superato il target, fine subito
+      if (msecsTo <= 0) {
+        onFinished();
+        return;
+      }
+
+      const totalSeconds = Math.floor(msecsTo / 1000);
+      const days    = Math.floor(totalSeconds / 86400);
+      const hours   = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+      const tenths  = Math.floor((msecsTo % 1000) / 100);
+
+      // decimi solo se flaggati e sotto i 10 secondi
+      const useDecimals = decimalsCheckbox.checked && totalSeconds < 10;
+      const pad2 = (n) => String(n).padStart(2, "0");
+
+      let text = "";
+      let useSplitIntDec = false;
+      let intPart = "";
+      let decPart = "";
+
+      if (totalSeconds >= 86400) {
+        // giorni:ore:min:sec
+        text = `${days}:${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+      } else if (totalSeconds >= 3600) {
+        // ore:min:sec
+        text = `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+      } else if (totalSeconds >= 60) {
+        // minuti:sec
+        const totalMinutes = Math.floor(totalSeconds / 60);
+        const s = totalSeconds % 60;
+        text = `${pad2(totalMinutes)}:${pad2(s)}`;
+      } else {
+        // < 60 secondi → qui gestiamo la parte "scenica"
+
+        if (totalSeconds === 0) {
+          // Appena i secondi interi diventano 0:
+          // niente stato intermedio → zero lampeggiante subito
+          onFinished();
+          return;
+        }
+
+        if (useDecimals) {
+          // Sotto i 10s, con decimi:
+          // - intero a UNA SOLA CIFRA (1..9)
+          // - decimi più piccoli, senza il punto
+          useSplitIntDec = true;
+          intPart = String(totalSeconds);
+          decPart = String(tenths);
+        } else {
+          // Senza decimi: secondi "normali"
+          // (una cifra se <10, altrimenti due)
+          text = totalSeconds < 10 ? String(totalSeconds) : pad2(totalSeconds);
+        }
+      }
+
+      if (useSplitIntDec) {
+        countIntSpan.textContent = intPart;
+        countDecSpan.textContent = decPart;
+      } else {
+        countIntSpan.textContent = text;
+        countDecSpan.textContent = "";
+      }
+    }
+
+    function onFinished() {
+      finished = true;
+
+      if (timerId !== null) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+
+      document.documentElement.style.setProperty("--bg-color", "#000000");
+      document.documentElement.style.setProperty("--text-color", "#ffffff");
+      countIntSpan.textContent = "0";
+      countDecSpan.textContent = "";
+
+      blinkVisible = true;
+      countdownText.style.visibility = "visible";
+      if (blinkId !== null) {
+        clearInterval(blinkId);
+      }
+      blinkId = setInterval(() => {
+        blinkVisible = !blinkVisible;
+        countdownText.style.visibility = blinkVisible ? "visible" : "hidden";
+      }, 100);
+    }
+
+    function startCountdown() {
+      // ferma eventuale blink precedente
+      if (blinkId !== null) {
+        clearInterval(blinkId);
+        blinkId = null;
+      }
+      countdownText.style.visibility = "visible";
+      finished = false;
+
+      const value = targetInput.value;
+      if (!value) {
+        alert("Imposta una data/ora di arrivo.");
+        return;
+      }
+
+      const localDate = new Date(value);
+      if (isNaN(localDate.getTime())) {
+        alert("Data/ora non valida.");
+        return;
+      }
+
+      targetTime = localDate.getTime();
+      const now = Date.now();
+      if (targetTime <= now) {
+        alert("La data/ora di arrivo deve essere nel futuro.");
+        return;
+      }
+
+      // Avvio timer principale
+      if (timerId !== null) {
+        clearInterval(timerId);
+      }
+      timerId = setInterval(updateCountdown, 100);
+      updateCountdown();
+
+      // Una volta avviato, nascondi i comandi (header)
+      setControlsVisibility(false);
+    }
+
+    // Colori testo/sfondo
+    textColorInput.addEventListener("input", () => {
+      document.documentElement.style.setProperty("--text-color", textColorInput.value);
+    });
+
+    bgColorInput.addEventListener("input", () => {
+      document.documentElement.style.setProperty("--bg-color", bgColorInput.value);
+    });
+
+    // Bottone start
+    startBtn.addEventListener("click", startCountdown);
+
+    // Bottone fullscreen (HTML5)
+    fullscreenBtn.addEventListener("click", () => {
+      const elem = document.documentElement;
+      if (!document.fullscreenElement) {
+        if (elem.requestFullscreen) {
+          elem.requestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    });
+
+    // Se il timer è già in esecuzione e cambi il target, riavvia
+    targetInput.addEventListener("change", () => {
+      if (timerId !== null) {
+        startCountdown();
+      }
+    });
+
+    // Shortcut tastiera: H = mostra/nascondi comandi
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "h" || event.key === "H") {
+        setControlsVisibility(!controlsVisible);
+      }
+    });
+
+    // Imposta colori iniziali
+    document.documentElement.style.setProperty("--bg-color", bgColorInput.value);
+    document.documentElement.style.setProperty("--text-color", textColorInput.value);
+
+    // Disegno iniziale
+    countIntSpan.textContent = "Imposta una data di arrivo";
+    countDecSpan.textContent = "";
+
+  })();
+</script>
+</body>
+</html>
