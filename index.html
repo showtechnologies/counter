@@ -20,7 +20,7 @@
     }
 
     body {
-      background-color: #111;
+      background-color: var(--bg-color); /* uguale allo sfondo countdown */
       color: #eee;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
       height: 100vh;
@@ -36,7 +36,7 @@
 
     header {
       padding: 0.5rem 1rem;
-      background: #222;
+      background: var(--bg-color); /* stesso colore del body/main */
       border-bottom: 1px solid #333;
       display: flex;
       align-items: center;
@@ -44,6 +44,13 @@
       gap: 1rem;
       flex-wrap: wrap;
       font-size: 0.85rem;
+      transition: opacity 0.3s ease;
+    }
+
+    /* Menu “nascosto” ma con spazio preservato */
+    #headerBar.hidden {
+      opacity: 0;
+      pointer-events: none;
     }
 
     .current-time {
@@ -70,17 +77,27 @@
       padding: 0.1rem 0.2rem;
     }
 
+    /* >>> QUI LA MODIFICA: bordo intorno alla casella colore <<< */
     .controls input[type="color"] {
-      padding: 0;
-      border: none;
+      -webkit-appearance: none;
+      border: 1px solid #666;
+      border-radius: 4px;
       width: 2rem;
       height: 1.2rem;
-      background: none;
+      padding: 0;
+      background: #111; /* leggero contrasto con lo sfondo */
+      cursor: pointer;
     }
 
-    .controls input[type="checkbox"] {
-      transform: scale(1.1);
+    .controls input[type="color"]::-webkit-color-swatch {
+      border-radius: 2px;
+      border: none;
     }
+
+    .controls input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+    /* <<< FINE MODIFICA */
 
     .controls input[type="text"] {
       font-size: 0.8rem;
@@ -138,16 +155,32 @@
       text-overflow: clip;
     }
 
-    /* Parte intera e decimi separati */
     #countInt {
       display: inline-block;
     }
 
-    #countDec {
-      display: inline-block;
-      font-size: 0.4em;        /* decimi più piccoli */
-      vertical-align: top;     /* in alto rispetto alla cifra grande */
-      margin-left: 0.05em;     /* piccolo distacco orizzontale */
+    /* Animazione cambio cifra SOLO ultimi 10s */
+    .countdown-label.tick {
+      animation: tickSwap 260ms ease-in-out;
+    }
+
+    @keyframes tickSwap {
+      0% {
+        transform: scale(1);
+        opacity: 1;
+      }
+      40% {
+        transform: scale(0.6);
+        opacity: 0;
+      }
+      55% {
+        transform: scale(1.25);
+        opacity: 0;
+      }
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
     }
 
     @media (max-width: 768px) {
@@ -196,11 +229,6 @@
         <input type="number" id="fontSizeInput" min="2" max="20" step="0.5" value="8">
       </label>
 
-      <label>
-        <input type="checkbox" id="decimalsCheckbox">
-        Decimi sotto i 10s
-      </label>
-
       <button id="startBtn">Imposta / Riavvia</button>
       <button id="fullscreenBtn">Full screen</button>
       <span style="font-size:0.75rem;opacity:0.7;">(tasto H: mostra/nascondi comandi)</span>
@@ -210,7 +238,7 @@
   <main id="countdownArea">
     <div class="countdown-wrapper">
       <div class="countdown-label" id="countdownText">
-        <span id="countInt">Imposta una data di arrivo</span><span id="countDec"></span>
+        <span id="countInt">Imposta una data di arrivo</span>
       </div>
     </div>
   </main>
@@ -220,10 +248,8 @@
   (function () {
     const countdownText    = document.getElementById("countdownText");
     const countIntSpan     = document.getElementById("countInt");
-    const countDecSpan     = document.getElementById("countDec");
     const currentTimeLabel = document.getElementById("currentTimeLabel");
     const targetInput      = document.getElementById("targetInput");
-    const decimalsCheckbox = document.getElementById("decimalsCheckbox");
     const textColorInput   = document.getElementById("textColorInput");
     const bgColorInput     = document.getElementById("bgColorInput");
     const fontFamilyInput  = document.getElementById("fontFamilyInput");
@@ -232,24 +258,23 @@
     const fullscreenBtn    = document.getElementById("fullscreenBtn");
     const headerBar        = document.getElementById("headerBar");
 
-    let targetTime   = null;   // timestamp ms
-    let timerId      = null;   // setInterval id per countdown
-    let blinkId      = null;   // blink finale
-    let finished     = false;
-    let blinkVisible = true;
-    let controlsVisible = true;
+    let targetTime        = null;   // timestamp ms
+    let timerId           = null;   // setInterval id per countdown
+    let blinkId           = null;   // blink finale
+    let finished          = false;
+    let blinkVisible      = true;
+    let controlsVisible   = true;
+    let lastSecondForAnim = null;   // per trigger animazione
 
-    // Default target: +24 ore
     function setDefaultTarget() {
       const now   = new Date();
       const t     = new Date(now.getTime() + 24 * 3600 * 1000);
       const local = new Date(t.getTime() - t.getTimezoneOffset() * 60000);
-      const value = local.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
+      const value = local.toISOString().slice(0, 16);
       targetInput.value = value;
     }
     setDefaultTarget();
 
-    // Ora corrente
     function updateCurrentTime() {
       const now = new Date();
       const pad = (n) => String(n).padStart(2, "0");
@@ -264,7 +289,6 @@
     setInterval(updateCurrentTime, 200);
     updateCurrentTime();
 
-    // Font + dimensione
     function applyFontSettings() {
       const ff = fontFamilyInput.value || 'SF Mono, Menlo, Consolas, "Roboto Mono", monospace';
       const sz = parseFloat(fontSizeInput.value) || 8;
@@ -276,22 +300,23 @@
     fontFamilyInput.addEventListener("change", applyFontSettings);
     fontSizeInput.addEventListener("change", applyFontSettings);
 
-    // Toggle visibilità comandi (header) – tasto H
     function setControlsVisibility(visible) {
       controlsVisible = visible;
-      headerBar.style.display = visible ? "flex" : "none";
+      if (visible) {
+        headerBar.classList.remove("hidden");
+      } else {
+        headerBar.classList.add("hidden");
+      }
     }
 
-    // Countdown
     function updateCountdown() {
       if (!targetTime || finished) {
         return;
       }
 
-      const now = Date.now();
+      const now   = Date.now();
       let msecsTo = targetTime - now;
 
-      // Se abbiamo superato il target, fine subito
       if (msecsTo <= 0) {
         onFinished();
         return;
@@ -302,58 +327,39 @@
       const hours   = Math.floor((totalSeconds % 86400) / 3600);
       const minutes = Math.floor((totalSeconds % 3600) / 60);
       const seconds = totalSeconds % 60;
-      const tenths  = Math.floor((msecsTo % 1000) / 100);
 
-      // decimi solo se flaggati e sotto i 10 secondi
-      const useDecimals = decimalsCheckbox.checked && totalSeconds < 10;
       const pad2 = (n) => String(n).padStart(2, "0");
-
       let text = "";
-      let useSplitIntDec = false;
-      let intPart = "";
-      let decPart = "";
 
       if (totalSeconds >= 86400) {
-        // giorni:ore:min:sec
         text = `${days}:${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
       } else if (totalSeconds >= 3600) {
-        // ore:min:sec
         text = `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
       } else if (totalSeconds >= 60) {
-        // minuti:sec
         const totalMinutes = Math.floor(totalSeconds / 60);
         const s = totalSeconds % 60;
         text = `${pad2(totalMinutes)}:${pad2(s)}`;
       } else {
-        // < 60 secondi → qui gestiamo la parte "scenica"
-
         if (totalSeconds === 0) {
-          // Appena i secondi interi diventano 0:
-          // niente stato intermedio → zero lampeggiante subito
           onFinished();
           return;
         }
-
-        if (useDecimals) {
-          // Sotto i 10s, con decimi:
-          // - intero a UNA SOLA CIFRA (1..9)
-          // - decimi più piccoli, senza il punto
-          useSplitIntDec = true;
-          intPart = String(totalSeconds);
-          decPart = String(tenths);
-        } else {
-          // Senza decimi: secondi "normali"
-          // (una cifra se <10, altrimenti due)
-          text = totalSeconds < 10 ? String(totalSeconds) : pad2(totalSeconds);
-        }
+        text = totalSeconds < 10 ? String(totalSeconds) : pad2(totalSeconds);
       }
 
-      if (useSplitIntDec) {
-        countIntSpan.textContent = intPart;
-        countDecSpan.textContent = decPart;
-      } else {
-        countIntSpan.textContent = text;
-        countDecSpan.textContent = "";
+      countIntSpan.textContent = text;
+
+      // Animazione SOLO negli ultimi 10 secondi
+      if (totalSeconds !== lastSecondForAnim) {
+        lastSecondForAnim = totalSeconds;
+
+        if (totalSeconds > 0 && totalSeconds <= 10) {
+          countdownText.classList.remove("tick");
+          void countdownText.offsetWidth; // force reflow
+          countdownText.classList.add("tick");
+        } else {
+          countdownText.classList.remove("tick");
+        }
       }
     }
 
@@ -365,30 +371,34 @@
         timerId = null;
       }
 
+      countdownText.classList.remove("tick");
+
       document.documentElement.style.setProperty("--bg-color", "#000000");
       document.documentElement.style.setProperty("--text-color", "#ffffff");
       countIntSpan.textContent = "0";
-      countDecSpan.textContent = "";
 
       blinkVisible = true;
       countdownText.style.visibility = "visible";
+
       if (blinkId !== null) {
         clearInterval(blinkId);
       }
+
+      // velocità lampeggio (ms)
       blinkId = setInterval(() => {
         blinkVisible = !blinkVisible;
         countdownText.style.visibility = blinkVisible ? "visible" : "hidden";
-      }, 100);
+      }, 500);
     }
 
     function startCountdown() {
-      // ferma eventuale blink precedente
       if (blinkId !== null) {
         clearInterval(blinkId);
         blinkId = null;
       }
       countdownText.style.visibility = "visible";
       finished = false;
+      lastSecondForAnim = null;
 
       const value = targetInput.value;
       if (!value) {
@@ -409,18 +419,15 @@
         return;
       }
 
-      // Avvio timer principale
       if (timerId !== null) {
         clearInterval(timerId);
       }
       timerId = setInterval(updateCountdown, 100);
       updateCountdown();
 
-      // Una volta avviato, nascondi i comandi (header)
       setControlsVisibility(false);
     }
 
-    // Colori testo/sfondo
     textColorInput.addEventListener("input", () => {
       document.documentElement.style.setProperty("--text-color", textColorInput.value);
     });
@@ -429,10 +436,8 @@
       document.documentElement.style.setProperty("--bg-color", bgColorInput.value);
     });
 
-    // Bottone start
     startBtn.addEventListener("click", startCountdown);
 
-    // Bottone fullscreen (HTML5)
     fullscreenBtn.addEventListener("click", () => {
       const elem = document.documentElement;
       if (!document.fullscreenElement) {
@@ -446,28 +451,22 @@
       }
     });
 
-    // Se il timer è già in esecuzione e cambi il target, riavvia
     targetInput.addEventListener("change", () => {
       if (timerId !== null) {
         startCountdown();
       }
     });
 
-    // Shortcut tastiera: H = mostra/nascondi comandi
     document.addEventListener("keydown", (event) => {
       if (event.key === "h" || event.key === "H") {
         setControlsVisibility(!controlsVisible);
       }
     });
 
-    // Imposta colori iniziali
     document.documentElement.style.setProperty("--bg-color", bgColorInput.value);
     document.documentElement.style.setProperty("--text-color", textColorInput.value);
 
-    // Disegno iniziale
     countIntSpan.textContent = "Imposta una data di arrivo";
-    countDecSpan.textContent = "";
-
   })();
 </script>
 </body>
