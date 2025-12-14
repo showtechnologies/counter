@@ -137,7 +137,7 @@
 
     .font-popup {
       position: absolute;
-      top: 130%;          /* poco sotto il bottone Font */
+      top: 130%;
       right: 0;
       background: #111;
       border: 1px solid #555;
@@ -146,10 +146,7 @@
       display: none;
       z-index: 10;
       box-shadow: 0 4px 10px rgba(0,0,0,0.7);
-
-      display: none;
       max-width: min(70vw, 640px);
-      /* layout a "chip" su più righe */
       flex-wrap: wrap;
       gap: 0.2rem;
     }
@@ -186,7 +183,6 @@
       opacity: 0.7;
     }
 
-    /* preview classi font */
     .font-option.mono {
       font-family: "SF Mono","Menlo","Consolas","Roboto Mono",monospace;
     }
@@ -308,67 +304,56 @@
         <button type="button" id="fontPickerBtn">Font</button>
         <span id="fontNameLabel" class="font-name-label">Mono</span>
         <div id="fontPopup" class="font-popup">
-          <!-- MONO -->
           <button type="button" class="font-option mono"
                   data-font='"SF Mono","Menlo","Consolas","Roboto Mono",monospace'>
             <span class="font-option-preview">12:34:56</span>
             <span class="font-option-label">Mono</span>
           </button>
-          <!-- SANS -->
           <button type="button" class="font-option sans"
                   data-font='system-ui,-apple-system,BlinkMacSystemFont,"Roboto",sans-serif'>
             <span class="font-option-preview">12:34:56</span>
             <span class="font-option-label">Sans (system)</span>
           </button>
-          <!-- DIGITAL / COURIER -->
           <button type="button" class="font-option digital"
                   data-font='"Courier New",Courier,monospace'>
             <span class="font-option-preview">12:34:56</span>
             <span class="font-option-label">Digital / Courier</span>
           </button>
-          <!-- HELVETICA / ARIAL -->
           <button type="button" class="font-option helvetica"
                   data-font='"Helvetica Neue",Arial,sans-serif'>
             <span class="font-option-preview">12:34:56</span>
             <span class="font-option-label">Helvetica / Arial</span>
           </button>
-          <!-- VERDANA -->
           <button type="button" class="font-option verdana"
                   data-font='Verdana,Geneva,sans-serif'>
             <span class="font-option-preview">12:34:56</span>
             <span class="font-option-label">Verdana</span>
           </button>
-          <!-- TREBUCHET -->
           <button type="button" class="font-option trebuchet"
                   data-font='"Trebuchet MS","Lucida Grande",Lucida,sans-serif'>
             <span class="font-option-preview">12:34:56</span>
             <span class="font-option-label">Trebuchet</span>
           </button>
-          <!-- IMPACT -->
           <button type="button" class="font-option impact"
                   data-font='Impact,Haettenschweiler,"Arial Narrow Bold",sans-serif'>
             <span class="font-option-preview">12:34:56</span>
             <span class="font-option-label">Impact</span>
           </button>
-          <!-- GILL SANS -->
           <button type="button" class="font-option gill"
                   data-font='"Gill Sans","Gill Sans MT",Calibri,"Trebuchet MS",sans-serif'>
             <span class="font-option-preview">12:34:56</span>
             <span class="font-option-label">Gill Sans</span>
           </button>
-          <!-- GEORGIA -->
           <button type="button" class="font-option georgia"
                   data-font='Georgia,"Times New Roman",serif'>
             <span class="font-option-preview">12:34:56</span>
             <span class="font-option-label">Georgia</span>
           </button>
-          <!-- TIMES NEW ROMAN -->
           <button type="button" class="font-option times"
                   data-font='"Times New Roman",Times,serif'>
             <span class="font-option-preview">12:34:56</span>
             <span class="font-option-label">Times</span>
           </button>
-          <!-- LUCIDA CONSOLE -->
           <button type="button" class="font-option lucida"
                   data-font='"Lucida Console","Lucida Sans Typewriter",monospace'>
             <span class="font-option-preview">12:34:56</span>
@@ -426,31 +411,23 @@
     let lastSecondForAnim = null;
     let baseFontSize      = 8;
 
-    // font attuale
     let currentFontFamily = '"SF Mono","Menlo","Consolas","Roboto Mono",monospace';
     let currentFontLabel  = "Mono";
 
-    // offset solo per visualizzare l'ora server, NON usato dal countdown
     let serverOffsetMs    = null;
 
-    // ---- Sync server: SOLO lettura oraria, il countdown NON la usa ----
     async function syncServerTime() {
       const url = "https://timeapi.io/api/Time/current/zone?timeZone=Europe/Rome";
-
       try {
         syncStatus.textContent = "Sync: in corso (solo lettura server)...";
         const t0 = Date.now();
         const resp = await fetch(url, { cache: "no-cache" });
         const t1 = Date.now();
 
-        if (!resp.ok) {
-          throw new Error("HTTP " + resp.status);
-        }
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
 
         const data = await resp.json();
-        if (!data.dateTime) {
-          throw new Error("Risposta inattesa dal server orario");
-        }
+        if (!data.dateTime) throw new Error("Risposta inattesa dal server orario");
 
         const serverMs = new Date(data.dateTime).getTime();
         const rtt      = t1 - t0;
@@ -458,7 +435,6 @@
 
         serverOffsetMs = serverMs - clientAtServer;
         const offsetMsRounded = Math.round(serverOffsetMs);
-
         syncStatus.textContent =
           `Sync: server (solo riferimento visivo, offset ~${offsetMsRounded} ms)`;
       } catch (err) {
@@ -469,15 +445,15 @@
       }
     }
 
-    // ---- setup iniziale ----
+    // >>> QUI la modifica: default = 1/1/2026 00:00 locali <<<
     function setDefaultTarget() {
-      const now   = new Date();
-      const t     = new Date(now.getTime() + 24 * 3600 * 1000);
+      const t = new Date(2026, 0, 1, 0, 0, 0); // 1 gennaio 2026, 00:00 ora locale
       const local = new Date(t.getTime() - t.getTimezoneOffset() * 60000);
-      const value = local.toISOString().slice(0, 16);
+      const value = local.toISOString().slice(0, 16); // "2026-01-01T00:00"
       targetInput.value = value;
     }
     setDefaultTarget();
+    // <<< fine modifica >>>
 
     function formatDate(d) {
       const pad = (n) => String(n).padStart(2, "0");
@@ -514,7 +490,6 @@
 
     fontSizeInput.addEventListener("change", applyFontSettings);
 
-    // ---- gestione popup font ----
     fontPickerBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       fontPopup.classList.toggle("open");
@@ -534,7 +509,6 @@
       });
     });
 
-    // chiudi popup se clicchi fuori
     document.addEventListener("click", () => {
       fontPopup.classList.remove("open");
     });
@@ -553,7 +527,6 @@
       }
     }
 
-    // ---- Countdown (usa SOLO Date.now() locale) ----
     function updateCountdown() {
       if (!targetTime || finished) return;
 
